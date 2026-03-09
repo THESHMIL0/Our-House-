@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Our Cat Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #fce4ec; /* Cute pink background */
+            margin-top: 50px;
+        }
+        #game-area {
+            background: white;
+            width: 300px;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #ff4081;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #e91e63;
+        }
+        .cat-emoji {
+            font-size: 80px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-area">
+        <h1>Cat Care!</h1>
+        <div class="cat-emoji">😸</div>
+        <h2>Name: <span id="cat-name">Loading...</span></h2>
+        <p>Hunger: <span id="cat-hunger">0</span>/100</p>
+        <button id="feed-btn">Feed Cat 🐟</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Connect to the server
+        const socket = io();
+
+        // Get elements from the page
+        const catNameLabel = document.getElementById('cat-name');
+        const catHungerLabel = document.getElementById('cat-hunger');
+        const feedButton = document.getElementById('feed-btn');
+
+        // Listen for updates from the server
+        socket.on('updateCat', (catData) => {
+            catNameLabel.innerText = catData.name;
+            catHungerLabel.innerText = catData.hunger;
+        });
+
+        // When the player clicks feed, tell the server!
+        feedButton.addEventListener('click', () => {
+            socket.emit('feedCat');
+        });
+    </script>
+</body>
+</html>
