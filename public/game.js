@@ -1,14 +1,32 @@
+// --- 1. MOBILE MAGIC DEBUGGER ---
+// If the game crashes, paint the error on the screen so we can see it!
+window.onerror = function(msg, url, line, col, error) {
+    const errorCanvas = document.getElementById('gameCanvas');
+    if (errorCanvas) {
+        const errorCtx = errorCanvas.getContext('2d');
+        errorCtx.fillStyle = 'white';
+        errorCtx.fillRect(0, 0, errorCanvas.width, errorCanvas.height);
+        errorCtx.fillStyle = 'red';
+        errorCtx.font = '16px Arial';
+        errorCtx.textAlign = 'left';
+        errorCtx.fillText("Crash! " + msg, 10, 50);
+        errorCtx.fillText("Line: " + line, 10, 80);
+    }
+    return false;
+};
+
+// --- 2. GAME SETUP ---
 const socket = io();
-const catHungerLabel = document.getElementById('cat-hunger');
-const feedButton = document.getElementById('feed-btn');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Grab UI elements safely
+const catHungerLabel = document.getElementById('cat-hunger');
+const feedButton = document.getElementById('feed-btn');
 const editMenu = document.getElementById('edit-menu');
 const btnShrink = document.getElementById('btn-shrink');
 const btnGrow = document.getElementById('btn-grow');
 const btnDone = document.getElementById('btn-done');
-
 const storeBtn = document.getElementById('store-btn');
 const storeModal = document.getElementById('store-modal');
 const closeStoreBtn = document.getElementById('close-store-btn');
@@ -19,15 +37,17 @@ let draggingItem = null;
 let selectedItem = null; 
 let cat = { x: 175, y: 400, targetX: 175, targetY: 400 };
 
-// --- NEW CAMERA SETTINGS ---
-const ROOM_WIDTH = 1400; // 4x the width of your screen!
-let cameraX = 0; // Where the camera is currently looking
+// --- 3. VIRTUAL CAMERA SETTINGS ---
+const ROOM_WIDTH = 1400; // 4x the width!
+let cameraX = 0; 
 let isPanning = false; 
 let panStartX = 0;
 let cameraStartX = 0;
 
+// --- 4. SERVER COMMUNICATION ---
 socket.on('updateCat', (catData) => {
-    catHungerLabel.innerText = catData.hunger;
+    // Safety check: Only update text if the label actually exists
+    if (catHungerLabel) catHungerLabel.innerText = catData.hunger;
     cat.targetX = catData.targetX;
     cat.targetY = catData.targetY;
 });
@@ -36,38 +56,32 @@ socket.on('updateHouse', (houseData) => {
     houseItems = houseData;
 });
 
-feedButton.addEventListener('click', () => {
-    socket.emit('feedCat');
-});
+if (feedButton) {
+    feedButton.addEventListener('click', () => socket.emit('feedCat'));
+}
 
-// --- STORE LOGIC ---
-storeBtn.addEventListener('click', () => {
-    storeModal.classList.remove('hidden');
-});
+// --- 5. STORE UI LOGIC ---
+if (storeBtn && storeModal) {
+    storeBtn.addEventListener('click', () => storeModal.classList.remove('hidden'));
+    closeStoreBtn.addEventListener('click', () => storeModal.classList.add('hidden'));
 
-closeStoreBtn.addEventListener('click', () => {
-    storeModal.classList.add('hidden');
-});
-
-storeItemsHtml.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const emoji = e.target.innerText;
-        
-        const newItem = {
-            id: 'item_' + Date.now(), 
-            emoji: emoji,
-            // Drop it exactly in the middle of where the camera is currently looking!
-            x: cameraX + (canvas.width / 2), 
-            y: 350,
-            scale: 1
-        };
-        
-        socket.emit('addFurniture', newItem);
-        storeModal.classList.add('hidden');
+    storeItemsHtml.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const emoji = e.target.innerText;
+            const newItem = {
+                id: 'item_' + Date.now(), 
+                emoji: emoji,
+                x: cameraX + (canvas.width / 2), // Drop in center of camera!
+                y: 350,
+                scale: 1
+            };
+            socket.emit('addFurniture', newItem);
+            storeModal.classList.add('hidden');
+        });
     });
-});
+}
 
-// --- BUTTON RESIZING LOGIC ---
+// --- 6. RESIZING LOGIC ---
 function emitUpdate() {
     if (selectedItem) {
         socket.emit('updateFurniture', { 
@@ -76,28 +90,28 @@ function emitUpdate() {
     }
 }
 
-btnGrow.addEventListener('click', () => {
-    if (selectedItem && selectedItem.scale < 3) { selectedItem.scale += 0.2; emitUpdate(); }
-});
+if (btnGrow) {
+    btnGrow.addEventListener('click', () => {
+        if (selectedItem && selectedItem.scale < 3) { selectedItem.scale += 0.2; emitUpdate(); }
+    });
+    btnShrink.addEventListener('click', () => {
+        if (selectedItem && selectedItem.scale > 0.5) { selectedItem.scale -= 0.2; emitUpdate(); }
+    });
+    btnDone.addEventListener('click', () => {
+        selectedItem = null;
+        editMenu.classList.add('hidden'); 
+    });
+}
 
-btnShrink.addEventListener('click', () => {
-    if (selectedItem && selectedItem.scale > 0.5) { selectedItem.scale -= 0.2; emitUpdate(); }
-});
-
-btnDone.addEventListener('click', () => {
-    selectedItem = null;
-    editMenu.classList.add('hidden'); 
-});
-
-// --- GAME LOOP ---
+// --- 7. THE GAME LOOP ---
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Turn on the virtual camera!
+    // Turn on Camera
     ctx.save();
     ctx.translate(-cameraX, 0); 
 
-    // Draw Wallpaper, Floor, and Baseboard out to the new ROOM_WIDTH!
+    // Draw wide room
     ctx.fillStyle = '#ffedeb'; 
     ctx.fillRect(0, 0, ROOM_WIDTH, canvas.height * 0.6);
     ctx.fillStyle = '#ccebff'; 
@@ -150,7 +164,7 @@ function gameLoop() {
     ctx.fillText('🐈', 0, 0); 
     ctx.restore(); 
 
-    // Turn off the virtual camera so the UI stays in place
+    // Turn off Camera
     ctx.restore();
 
     requestAnimationFrame(gameLoop);
@@ -158,10 +172,9 @@ function gameLoop() {
 
 gameLoop();
 
-// --- INTERACTION (WITH CAMERA LOGIC) ---
+// --- 8. CAMERA & TOUCH CONTROLS ---
 canvas.addEventListener('pointerdown', (e) => {
     const rect = canvas.getBoundingClientRect();
-    // Add the camera position to our finger position to find the item!
     const mouseX = e.clientX - rect.left + cameraX; 
     const mouseY = e.clientY - rect.top;
     
@@ -175,15 +188,14 @@ canvas.addEventListener('pointerdown', (e) => {
             draggingItem = item;
             selectedItem = item; 
             clickedSomething = true;
-            editMenu.classList.remove('hidden');
+            if (editMenu) editMenu.classList.remove('hidden');
             break;
         }
     }
 
-    // If we didn't click furniture, we must want to pan the camera!
     if (!clickedSomething) {
         selectedItem = null;
-        editMenu.classList.add('hidden');
+        if (editMenu) editMenu.classList.add('hidden');
         isPanning = true;
         panStartX = e.clientX;
         cameraStartX = cameraX;
@@ -193,25 +205,18 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
     const rect = canvas.getBoundingClientRect();
     
-    // If holding furniture, move the furniture
     if (draggingItem) {
         draggingItem.x = e.clientX - rect.left + cameraX;
         draggingItem.y = e.clientY - rect.top;
     } 
-    // If holding the floor, pan the camera!
     else if (isPanning) {
         cameraX = cameraStartX - (e.clientX - panStartX);
-        
-        // Stop the camera from going past the walls
         if (cameraX < 0) cameraX = 0;
         if (cameraX > ROOM_WIDTH - canvas.width) cameraX = ROOM_WIDTH - canvas.width;
     }
 });
 
 canvas.addEventListener('pointerup', (e) => {
-    if (draggingItem) {
-        emitUpdate();
-        draggingItem = null; 
-    }
-    isPanning = false; // Stop panning when you let go
+    if (draggingItem) { emitUpdate(); draggingItem = null; }
+    isPanning = false; 
 });
