@@ -4,51 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Our Cat Game</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #fce4ec;
-            margin: 10px;
-            /* Prevents the whole page from bouncing on mobile */
-            overscroll-behavior-y: contain; 
-        }
-        #ui-area {
-            background: white;
-            padding: 15px;
-            border-radius: 15px;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        button {
-            background-color: #ff4081;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        /* Our new house room! */
-        #room {
-            width: 300px;
-            height: 300px;
-            background-color: #ffe0b2; /* Light wood color */
-            border: 4px solid #8d6e63; /* Dark wood borders */
-            border-radius: 10px;
-            position: relative;
-            margin: 0 auto;
-            overflow: hidden; /* Keeps furniture inside the walls */
-        }
-        /* Style for the draggable items */
-        .furniture {
-            position: absolute;
-            font-size: 40px;
-            cursor: grab;
-            user-select: none;
-            touch-action: none; /* Crucial for phone: stops screen scrolling while dragging */
-        }
-    </style>
+    
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -62,77 +19,6 @@
         </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const catHungerLabel = document.getElementById('cat-hunger');
-        const feedButton = document.getElementById('feed-btn');
-        const room = document.getElementById('room');
-
-        // --- CAT LOGIC ---
-        socket.on('updateCat', (catData) => {
-            catHungerLabel.innerText = catData.hunger;
-        });
-
-        feedButton.addEventListener('click', () => {
-            socket.emit('feedCat');
-        });
-
-        // --- HOUSE & FURNITURE LOGIC ---
-        socket.on('updateHouse', (houseData) => {
-            houseData.forEach(item => {
-                // Check if the furniture is already on the screen
-                let el = document.getElementById(item.id);
-                
-                // If it's not on the screen yet, create it!
-                if (!el) {
-                    el = document.createElement('div');
-                    el.className = 'furniture';
-                    el.id = item.id;
-                    el.innerText = item.emoji;
-                    room.appendChild(el);
-
-                    // --- DRAG AND DROP MAGIC ---
-                    let isDragging = false;
-
-                    // When you touch the screen
-                    el.addEventListener('pointerdown', (e) => {
-                        isDragging = true;
-                        el.setPointerCapture(e.pointerId);
-                    });
-
-                    // When you move your finger
-                    el.addEventListener('pointermove', (e) => {
-                        if (isDragging) {
-                            const roomRect = room.getBoundingClientRect();
-                            // Calculate position relative to the room walls
-                            let newX = e.clientX - roomRect.left - 20; 
-                            let newY = e.clientY - roomRect.top - 20;
-                            el.style.left = newX + 'px';
-                            el.style.top = newY + 'px';
-                        }
-                    });
-
-                    // When you let go of the screen
-                    el.addEventListener('pointerup', (e) => {
-                        if (isDragging) {
-                            isDragging = false;
-                            el.releasePointerCapture(e.pointerId);
-                            
-                            // Get final position and tell the server!
-                            const roomRect = room.getBoundingClientRect();
-                            let finalX = e.clientX - roomRect.left - 20;
-                            let finalY = e.clientY - roomRect.top - 20;
-                            
-                            socket.emit('moveFurniture', { id: item.id, x: finalX, y: finalY });
-                        }
-                    });
-                }
-                
-                // Update the visual position based on server data
-                el.style.left = item.x + 'px';
-                el.style.top = item.y + 'px';
-            });
-        });
-    </script>
+    <script src="game.js"></script>
 </body>
 </html>
