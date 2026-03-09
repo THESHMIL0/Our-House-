@@ -3,16 +3,19 @@ const catHungerLabel = document.getElementById('cat-hunger');
 const feedButton = document.getElementById('feed-btn');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const editTools = document.getElementById('edit-tools');
-const sizeSlider = document.getElementById('size-slider');
+
+// Grab our new menu buttons
+const editMenu = document.getElementById('edit-menu');
+const btnShrink = document.getElementById('btn-shrink');
+const btnGrow = document.getElementById('btn-grow');
+const btnDone = document.getElementById('btn-done');
 
 let houseItems = []; 
 let draggingItem = null; 
-let selectedItem = null; // Keeps track of what item we clicked to resize
+let selectedItem = null; 
 
 let cat = { x: 175, y: 400, targetX: 175, targetY: 400 };
 
-// --- SERVER UPDATES ---
 socket.on('updateCat', (catData) => {
     catHungerLabel.innerText = catData.hunger;
     cat.targetX = catData.targetX;
@@ -27,12 +30,9 @@ feedButton.addEventListener('click', () => {
     socket.emit('feedCat');
 });
 
-// --- SLIDER LOGIC ---
-// When we move the slider, resize the selected item instantly!
-sizeSlider.addEventListener('input', (e) => {
+// --- NEW BUTTON RESIZING LOGIC ---
+function emitUpdate() {
     if (selectedItem) {
-        selectedItem.scale = parseFloat(e.target.value);
-        // Tell the server the new size
         socket.emit('updateFurniture', { 
             id: selectedItem.id, 
             x: selectedItem.x, 
@@ -40,9 +40,31 @@ sizeSlider.addEventListener('input', (e) => {
             scale: selectedItem.scale 
         });
     }
+}
+
+// When you tap ➕
+btnGrow.addEventListener('click', () => {
+    if (selectedItem && selectedItem.scale < 3) {
+        selectedItem.scale += 0.2; // Grow by 20%
+        emitUpdate();
+    }
 });
 
-// --- THE GAME LOOP ---
+// When you tap ➖
+btnShrink.addEventListener('click', () => {
+    if (selectedItem && selectedItem.scale > 0.5) {
+        selectedItem.scale -= 0.2; // Shrink by 20%
+        emitUpdate();
+    }
+});
+
+// When you tap ✅
+btnDone.addEventListener('click', () => {
+    selectedItem = null;
+    editMenu.classList.add('hidden'); // Hide the menu
+});
+
+// --- GAME LOOP ---
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -56,23 +78,19 @@ function gameLoop() {
     ctx.textAlign = 'center'; 
     ctx.textBaseline = 'middle';
 
-    // 1. Draw Furniture
     houseItems.forEach(item => {
         let scale = item.scale || 1;
-        let size = 70 * scale; // Adjust size based on scale!
+        let size = 70 * scale; 
         ctx.font = size + 'px Arial'; 
 
-        // Draw shadow
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath();
         ctx.ellipse(item.x, item.y + (size/2), size/2, size/6, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // FIX THE BUG: Switch back to solid color before drawing the emoji!
         ctx.fillStyle = 'black'; 
         ctx.fillText(item.emoji, item.x, item.y);
 
-        // If this item is selected, draw a dashed ring around it!
         if (selectedItem && selectedItem.id === item.id) {
             ctx.strokeStyle = '#ff7043';
             ctx.lineWidth = 2;
@@ -80,11 +98,10 @@ function gameLoop() {
             ctx.beginPath();
             ctx.arc(item.x, item.y, size/1.5, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.setLineDash([]); // Reset dashed lines
+            ctx.setLineDash([]); 
         }
     });
 
-    // 2. Draw Cat
     let dx = cat.targetX - cat.x;
     let dy = cat.targetY - cat.y;
     cat.x += dx * 0.02; 
@@ -100,7 +117,6 @@ function gameLoop() {
     ctx.translate(cat.x, cat.y); 
     if (dx < 0) ctx.scale(-1, 1); 
     
-    // FIX THE BUG for the cat too!
     ctx.fillStyle = 'black'; 
     ctx.fillText('🐈', 0, 0); 
     ctx.restore(); 
@@ -110,7 +126,7 @@ function gameLoop() {
 
 gameLoop();
 
-// --- INTERACTION LOGIC ---
+// --- INTERACTION ---
 canvas.addEventListener('pointerdown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -118,27 +134,24 @@ canvas.addEventListener('pointerdown', (e) => {
     
     let clickedSomething = false;
 
-    // Check if we tapped a piece of furniture
     for (let i = houseItems.length - 1; i >= 0; i--) {
         let item = houseItems[i];
         let size = 70 * (item.scale || 1);
         
         if (Math.abs(mouseX - item.x) < size/1.5 && Math.abs(mouseY - item.y) < size/1.5) {
             draggingItem = item;
-            selectedItem = item; // Mark as selected
+            selectedItem = item; 
             clickedSomething = true;
             
-            // Show the edit tools and set the slider to the item's current size!
-            editTools.style.visibility = 'visible';
-            sizeSlider.value = item.scale || 1;
+            // Pop up the edit menu!
+            editMenu.classList.remove('hidden');
             break;
         }
     }
 
-    // If we clicked the empty floor, hide the edit tools
     if (!clickedSomething) {
         selectedItem = null;
-        editTools.style.visibility = 'hidden';
+        editMenu.classList.add('hidden');
     }
 });
 
@@ -152,12 +165,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 canvas.addEventListener('pointerup', (e) => {
     if (draggingItem) {
-        socket.emit('updateFurniture', { 
-            id: draggingItem.id, 
-            x: draggingItem.x, 
-            y: draggingItem.y,
-            scale: draggingItem.scale || 1
-        });
+        emitUpdate();
         draggingItem = null; 
     }
 });
