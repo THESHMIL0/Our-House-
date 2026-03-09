@@ -9,7 +9,7 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 let catData = {
-    name: "kushu",
+    name: "Luna",
     hunger: 50,
     happiness: 100,
     targetX: 175,
@@ -45,10 +45,9 @@ io.on('connection', (socket) => {
         }
     });
 
-    // NEW: Listen for new furniture from the store!
     socket.on('addFurniture', (newItem) => {
         houseData.push(newItem);
-        io.emit('updateHouse', houseData); // Send new list to everyone
+        io.emit('updateHouse', houseData); 
     });
 
     socket.on('disconnect', () => {
@@ -56,8 +55,9 @@ io.on('connection', (socket) => {
     });
 });
 
+// THE CAT'S NEW BOUNDARIES (Now 1400px wide!)
 setInterval(() => {
-    catData.targetX = 50 + Math.random() * 250; 
+    catData.targetX = 50 + Math.random() * 1300; 
     catData.targetY = 320 + Math.random() * 150; 
     io.emit('updateCat', catData);
 }, 4000);
