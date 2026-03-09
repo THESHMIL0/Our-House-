@@ -3,22 +3,18 @@ const catHungerLabel = document.getElementById('cat-hunger');
 const feedButton = document.getElementById('feed-btn');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const editTools = document.getElementById('edit-tools');
+const sizeSlider = document.getElementById('size-slider');
 
 let houseItems = []; 
 let draggingItem = null; 
+let selectedItem = null; // Keeps track of what item we clicked to resize
 
-// Track the cat's physical position on the screen
-let cat = {
-    x: 175,
-    y: 400,
-    targetX: 175,
-    targetY: 400
-};
+let cat = { x: 175, y: 400, targetX: 175, targetY: 400 };
 
 // --- SERVER UPDATES ---
 socket.on('updateCat', (catData) => {
     catHungerLabel.innerText = catData.hunger;
-    // When server picks a new spot, update our target!
     cat.targetX = catData.targetX;
     cat.targetY = catData.targetY;
 });
@@ -31,12 +27,25 @@ feedButton.addEventListener('click', () => {
     socket.emit('feedCat');
 });
 
-// --- THE NEW GAME LOOP ---
+// --- SLIDER LOGIC ---
+// When we move the slider, resize the selected item instantly!
+sizeSlider.addEventListener('input', (e) => {
+    if (selectedItem) {
+        selectedItem.scale = parseFloat(e.target.value);
+        // Tell the server the new size
+        socket.emit('updateFurniture', { 
+            id: selectedItem.id, 
+            x: selectedItem.x, 
+            y: selectedItem.y,
+            scale: selectedItem.scale 
+        });
+    }
+});
+
+// --- THE GAME LOOP ---
 function gameLoop() {
-    // 1. Wipe the screen clean every frame
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Draw Wallpaper & Floor
     ctx.fillStyle = '#ffedeb'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height * 0.6);
     ctx.fillStyle = '#ccebff'; 
@@ -44,66 +53,92 @@ function gameLoop() {
     ctx.fillStyle = '#8bbbf0'; 
     ctx.fillRect(0, canvas.height * 0.6, canvas.width, 10);
 
-    // 3. Setup Emoji Font
-    ctx.font = '70px Arial'; 
     ctx.textAlign = 'center'; 
     ctx.textBaseline = 'middle';
 
-    // 4. Draw Furniture
+    // 1. Draw Furniture
     houseItems.forEach(item => {
+        let scale = item.scale || 1;
+        let size = 70 * scale; // Adjust size based on scale!
+        ctx.font = size + 'px Arial'; 
+
+        // Draw shadow
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath();
-        ctx.ellipse(item.x, item.y + 35, 30, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(item.x, item.y + (size/2), size/2, size/6, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        // FIX THE BUG: Switch back to solid color before drawing the emoji!
+        ctx.fillStyle = 'black'; 
         ctx.fillText(item.emoji, item.x, item.y);
+
+        // If this item is selected, draw a dashed ring around it!
+        if (selectedItem && selectedItem.id === item.id) {
+            ctx.strokeStyle = '#ff7043';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(item.x, item.y, size/1.5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset dashed lines
+        }
     });
 
-    // 5. --- CAT WALKING LOGIC ---
-    // Calculate how far the cat is from her target
+    // 2. Draw Cat
     let dx = cat.targetX - cat.x;
     let dy = cat.targetY - cat.y;
-    
-    // Move 2% of the way there every frame (makes it smooth!)
     cat.x += dx * 0.02; 
     cat.y += dy * 0.02;
 
-    // Draw Cat Shadow
+    ctx.font = '70px Arial'; 
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.beginPath();
     ctx.ellipse(cat.x, cat.y + 30, 25, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw the Cat (With flipping magic!)
     ctx.save(); 
     ctx.translate(cat.x, cat.y); 
+    if (dx < 0) ctx.scale(-1, 1); 
     
-    // If dx is negative, she is walking left, so we mirror the canvas!
-    if (dx < 0) {
-        ctx.scale(-1, 1); 
-    }
-    
+    // FIX THE BUG for the cat too!
+    ctx.fillStyle = 'black'; 
     ctx.fillText('🐈', 0, 0); 
     ctx.restore(); 
 
-    // 6. Loop forever!
     requestAnimationFrame(gameLoop);
 }
 
-// Start the game loop for the first time
 gameLoop();
 
-// --- DRAG & DROP LOGIC ---
+// --- INTERACTION LOGIC ---
 canvas.addEventListener('pointerdown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+    
+    let clickedSomething = false;
 
-    for (let i = 0; i < houseItems.length; i++) {
+    // Check if we tapped a piece of furniture
+    for (let i = houseItems.length - 1; i >= 0; i--) {
         let item = houseItems[i];
-        if (Math.abs(mouseX - item.x) < 40 && Math.abs(mouseY - item.y) < 40) {
+        let size = 70 * (item.scale || 1);
+        
+        if (Math.abs(mouseX - item.x) < size/1.5 && Math.abs(mouseY - item.y) < size/1.5) {
             draggingItem = item;
+            selectedItem = item; // Mark as selected
+            clickedSomething = true;
+            
+            // Show the edit tools and set the slider to the item's current size!
+            editTools.style.visibility = 'visible';
+            sizeSlider.value = item.scale || 1;
             break;
         }
+    }
+
+    // If we clicked the empty floor, hide the edit tools
+    if (!clickedSomething) {
+        selectedItem = null;
+        editTools.style.visibility = 'hidden';
     }
 });
 
@@ -117,10 +152,11 @@ canvas.addEventListener('pointermove', (e) => {
 
 canvas.addEventListener('pointerup', (e) => {
     if (draggingItem) {
-        socket.emit('moveFurniture', { 
+        socket.emit('updateFurniture', { 
             id: draggingItem.id, 
             x: draggingItem.x, 
-            y: draggingItem.y 
+            y: draggingItem.y,
+            scale: draggingItem.scale || 1
         });
         draggingItem = null; 
     }
