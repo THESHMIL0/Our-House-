@@ -1,13 +1,11 @@
 const socket = io();
 const catHungerLabel = document.getElementById('cat-hunger');
 const feedButton = document.getElementById('feed-btn');
-
-// --- SET UP THE CANVAS ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-let houseItems = []; // This will store the data from the server
-let draggingItem = null; // Keeps track of what we are currently dragging
+let houseItems = []; 
+let draggingItem = null; 
 
 // --- CAT LOGIC ---
 socket.on('updateCat', (catData) => {
@@ -18,58 +16,54 @@ feedButton.addEventListener('click', () => {
     socket.emit('feedCat');
 });
 
-// --- DRAWING THE GAME USING CODE ---
+// --- DRAWING THE NEW 2.5D GAME ---
 function drawGame() {
-    // 1. Clear the old frame (wipe the sketchpad clean)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Loop through all the furniture the server sent us
+    // 1. Draw the Wall (Top 60% of the screen)
+    ctx.fillStyle = '#ffedeb'; // Light pink wallpaper
+    ctx.fillRect(0, 0, canvas.width, canvas.height * 0.6);
+
+    // 2. Draw the Floor (Bottom 40% of the screen)
+    ctx.fillStyle = '#ccebff'; // Light blue floor (like your screenshot!)
+    ctx.fillRect(0, canvas.height * 0.6, canvas.width, canvas.height * 0.4);
+
+    // 3. Draw the Baseboard (Line between wall and floor)
+    ctx.fillStyle = '#8bbbf0'; // Darker blue line
+    ctx.fillRect(0, canvas.height * 0.6, canvas.width, 10);
+
+    // 4. Draw the Furniture!
+    ctx.font = '70px Arial'; // Draw huge emojis
+    ctx.textAlign = 'center'; // Center the item on our finger
+    ctx.textBaseline = 'middle';
+
     houseItems.forEach(item => {
-        
-        if (item.id === 'bed') {
-            // Draw a Bed (Blue mattress + White pillow)
-            ctx.fillStyle = '#42a5f5'; // Blue color
-            ctx.fillRect(item.x, item.y, 50, 70); // Mattress
-            ctx.fillStyle = '#ffffff'; // White color
-            ctx.fillRect(item.x + 5, item.y + 5, 40, 20); // Pillow
-            
-        } else if (item.id === 'sofa') {
-            // Draw a Sofa (Dark red back + bright red seat)
-            ctx.fillStyle = '#b71c1c'; // Dark red
-            ctx.fillRect(item.x, item.y, 80, 40); // Backrest
-            ctx.fillStyle = '#f44336'; // Bright red
-            ctx.fillRect(item.x, item.y + 15, 80, 25); // Seat
-            
-        } else if (item.id === 'plant') {
-            // Draw a Plant (Brown pot + Green leaves)
-            ctx.fillStyle = '#795548'; // Brown pot
-            ctx.fillRect(item.x + 15, item.y + 25, 20, 25);
-            ctx.fillStyle = '#4caf50'; // Green leaves (drawn as a circle!)
-            ctx.beginPath();
-            ctx.arc(item.x + 25, item.y + 15, 20, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        // Draw a shadow under the item to make it look 3D
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.beginPath();
+        ctx.ellipse(item.x, item.y + 35, 30, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw the item itself (Using the emoji from our server!)
+        ctx.fillText(item.emoji, item.x, item.y);
     });
 }
 
-// Listen for server updates and redraw the game
 socket.on('updateHouse', (houseData) => {
     houseItems = houseData;
-    drawGame(); // Redraw whenever the server sends new positions!
+    drawGame(); 
 });
 
-// --- NEW CANVAS DRAG & DROP MAGIC ---
-
+// --- DRAG & DROP LOGIC ---
 canvas.addEventListener('pointerdown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // Check if we clicked on any furniture (Assuming a roughly 50x50 hit area)
+    // Check if we clicked near the center of an emoji
     for (let i = 0; i < houseItems.length; i++) {
         let item = houseItems[i];
-        if (mouseX >= item.x && mouseX <= item.x + 60 &&
-            mouseY >= item.y && mouseY <= item.y + 60) {
+        if (Math.abs(mouseX - item.x) < 40 && Math.abs(mouseY - item.y) < 40) {
             draggingItem = item;
             break;
         }
@@ -79,21 +73,19 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
     if (draggingItem) {
         const rect = canvas.getBoundingClientRect();
-        // Update item position to follow your finger/mouse
-        draggingItem.x = e.clientX - rect.left - 25; // -25 centers it on your finger
-        draggingItem.y = e.clientY - rect.top - 25;
-        drawGame(); // Redraw the game instantly so it follows you
+        draggingItem.x = e.clientX - rect.left;
+        draggingItem.y = e.clientY - rect.top;
+        drawGame(); 
     }
 });
 
 canvas.addEventListener('pointerup', (e) => {
     if (draggingItem) {
-        // Tell the server where we finally dropped it!
         socket.emit('moveFurniture', { 
             id: draggingItem.id, 
             x: draggingItem.x, 
             y: draggingItem.y 
         });
-        draggingItem = null; // Stop dragging
+        draggingItem = null; 
     }
 });
