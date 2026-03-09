@@ -9,14 +9,13 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 let catData = {
-    name: "Luna",
+    name: "kushu",
     hunger: 50,
     happiness: 100,
     targetX: 175,
     targetY: 400
 };
 
-// ADDED: "scale: 1" to track the size of each item!
 let houseData = [
     { id: 'bed', emoji: '🛏️', x: 100, y: 350, scale: 1 },
     { id: 'sofa', emoji: '🛋️', x: 250, y: 350, scale: 1 },
@@ -36,15 +35,20 @@ io.on('connection', (socket) => {
         }
     });
 
-    // UPDATED: Now it handles moving AND resizing
     socket.on('updateFurniture', (data) => {
         let item = houseData.find(f => f.id === data.id);
         if (item) {
             item.x = data.x;
             item.y = data.y;
-            item.scale = data.scale; // Save the new size
-            io.emit('updateHouse', houseData); // Broadcast to everyone
+            item.scale = data.scale; 
+            io.emit('updateHouse', houseData); 
         }
+    });
+
+    // NEW: Listen for new furniture from the store!
+    socket.on('addFurniture', (newItem) => {
+        houseData.push(newItem);
+        io.emit('updateHouse', houseData); // Send new list to everyone
     });
 
     socket.on('disconnect', () => {
