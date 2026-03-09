@@ -8,7 +8,6 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// Cat state now includes target coordinates for walking!
 let catData = {
     name: "Luna",
     hunger: 50,
@@ -17,11 +16,11 @@ let catData = {
     targetY: 400
 };
 
-// Initial furniture positions
+// ADDED: "scale: 1" to track the size of each item!
 let houseData = [
-    { id: 'bed', emoji: '🛏️', x: 100, y: 350 },
-    { id: 'sofa', emoji: '🛋️', x: 250, y: 350 },
-    { id: 'plant', emoji: '🪴', x: 50, y: 450 }
+    { id: 'bed', emoji: '🛏️', x: 100, y: 350, scale: 1 },
+    { id: 'sofa', emoji: '🛋️', x: 250, y: 350, scale: 1 },
+    { id: 'plant', emoji: '🪴', x: 50, y: 450, scale: 1 }
 ];
 
 io.on('connection', (socket) => {
@@ -37,12 +36,14 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('moveFurniture', (data) => {
+    // UPDATED: Now it handles moving AND resizing
+    socket.on('updateFurniture', (data) => {
         let item = houseData.find(f => f.id === data.id);
         if (item) {
             item.x = data.x;
             item.y = data.y;
-            io.emit('updateHouse', houseData);
+            item.scale = data.scale; // Save the new size
+            io.emit('updateHouse', houseData); // Broadcast to everyone
         }
     });
 
@@ -51,14 +52,9 @@ io.on('connection', (socket) => {
     });
 });
 
-// --- THE CAT'S BRAIN ---
-// Every 4 seconds, the server picks a new random spot for the cat to walk to
 setInterval(() => {
-    // Pick a random X and Y inside the blue floor area
     catData.targetX = 50 + Math.random() * 250; 
     catData.targetY = 320 + Math.random() * 150; 
-    
-    // Tell all players where the cat is going!
     io.emit('updateCat', catData);
 }, 4000);
 
