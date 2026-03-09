@@ -8,28 +8,28 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// Shared game state
+// Cat state now includes target coordinates for walking!
 let catData = {
     name: "Luna",
     hunger: 50,
-    happiness: 100
+    happiness: 100,
+    targetX: 175,
+    targetY: 400
 };
 
-// Shared house state (our furniture and where it is)
+// Initial furniture positions
 let houseData = [
-    { id: 'bed', emoji: '🛏️', x: 20, y: 20 },
-    { id: 'sofa', emoji: '🛋️', x: 150, y: 20 },
-    { id: 'plant', emoji: '🪴', x: 20, y: 150 }
+    { id: 'bed', emoji: '🛏️', x: 100, y: 350 },
+    { id: 'sofa', emoji: '🛋️', x: 250, y: 350 },
+    { id: 'plant', emoji: '🪴', x: 50, y: 450 }
 ];
 
 io.on('connection', (socket) => {
     console.log('A player connected!');
 
-    // Send the current cat and house data to the new player
     socket.emit('updateCat', catData);
     socket.emit('updateHouse', houseData);
 
-    // When a player clicks the "feed" button
     socket.on('feedCat', () => {
         if (catData.hunger < 100) {
             catData.hunger += 10;
@@ -37,15 +37,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    // When a player drags and drops furniture
     socket.on('moveFurniture', (data) => {
-        // Find the specific piece of furniture they moved
         let item = houseData.find(f => f.id === data.id);
         if (item) {
-            // Update its position
             item.x = data.x;
             item.y = data.y;
-            // Tell everyone playing about the new position!
             io.emit('updateHouse', houseData);
         }
     });
@@ -54,6 +50,17 @@ io.on('connection', (socket) => {
         console.log('A player disconnected.');
     });
 });
+
+// --- THE CAT'S BRAIN ---
+// Every 4 seconds, the server picks a new random spot for the cat to walk to
+setInterval(() => {
+    // Pick a random X and Y inside the blue floor area
+    catData.targetX = 50 + Math.random() * 250; 
+    catData.targetY = 320 + Math.random() * 150; 
+    
+    // Tell all players where the cat is going!
+    io.emit('updateCat', catData);
+}, 4000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
