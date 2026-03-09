@@ -6,31 +6,47 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve the frontend files from the "public" folder
 app.use(express.static('public'));
 
-// This is our shared game state
+// Shared game state
 let catData = {
     name: "Luna",
     hunger: 50,
     happiness: 100
 };
 
-// When a player connects to the game
+// Shared house state (our furniture and where it is)
+let houseData = [
+    { id: 'bed', emoji: '🛏️', x: 20, y: 20 },
+    { id: 'sofa', emoji: '🛋️', x: 150, y: 20 },
+    { id: 'plant', emoji: '🪴', x: 20, y: 150 }
+];
+
 io.on('connection', (socket) => {
     console.log('A player connected!');
 
-    // Instantly send them the current cat data
+    // Send the current cat and house data to the new player
     socket.emit('updateCat', catData);
+    socket.emit('updateHouse', houseData);
 
-    // When this player clicks the "feed" button
+    // When a player clicks the "feed" button
     socket.on('feedCat', () => {
         if (catData.hunger < 100) {
-            catData.hunger += 10; // Increase hunger bar
-            console.log('The cat was fed!');
-            
-            // Broadcast the new cat data to EVERYONE playing
+            catData.hunger += 10;
             io.emit('updateCat', catData);
+        }
+    });
+
+    // When a player drags and drops furniture
+    socket.on('moveFurniture', (data) => {
+        // Find the specific piece of furniture they moved
+        let item = houseData.find(f => f.id === data.id);
+        if (item) {
+            // Update its position
+            item.x = data.x;
+            item.y = data.y;
+            // Tell everyone playing about the new position!
+            io.emit('updateHouse', houseData);
         }
     });
 
@@ -39,8 +55,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start the server on port 3000 (or the port Render assigns us)
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Game server running on http://localhost:${PORT}`);
+    console.log(`Game server running on port ${PORT}`);
 });
