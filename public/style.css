@@ -1,7 +1,7 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     text-align: center;
-    background-color: #fff0f5; /* Very soft pink background */
+    background-color: #fff0f5; 
     margin: 0;
     padding: 0;
     overscroll-behavior-y: contain; 
@@ -15,19 +15,30 @@ body {
     width: 100%;
     padding: 15px;
     display: flex;
-    justify-content: space-around;
+    justify-content: space-between; /* Pushes tools and stats to the edges */
+    align-items: center;
     background: white;
     box-shadow: 0px 2px 10px rgba(0,0,0,0.05);
     font-weight: bold;
     color: #ff7043;
     z-index: 10;
+    box-sizing: border-box;
 }
 
-.coin-box {
-    background: #fff9c4;
-    padding: 5px 15px;
-    border-radius: 20px;
-    border: 2px solid #fbc02d;
+/* New style for our size slider */
+#edit-tools {
+    display: flex;
+    align-items: center;
+    background: #e3f2fd;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 14px;
+    color: #1976d2;
+}
+
+#size-slider {
+    width: 70px;
+    margin-left: 5px;
 }
 
 #gameCanvas {
