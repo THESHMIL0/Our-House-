@@ -8,13 +8,18 @@
 </head>
 <body>
 
-    <div id="ui-area">
-        <h2>Cat Care! 😸</h2>
-        <p><span id="cat-name">Luna</span>'s Hunger: <span id="cat-hunger">0</span>/100</p>
-        <button id="feed-btn">Feed 🐟</button>
+    <div id="top-bar">
+        <div class="coin-box">🪙 1046</div>
+        <div class="stats">Luna's Hunger: <span id="cat-hunger">0</span>/100</div>
     </div>
 
-    <canvas id="gameCanvas" width="300" height="300"></canvas>
+    <canvas id="gameCanvas" width="350" height="500"></canvas>
+
+    <div id="bottom-bar">
+        <button id="feed-btn">Feed 🐟</button>
+        <button>Store 🏪</button>
+        <button>Us 💑</button>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
