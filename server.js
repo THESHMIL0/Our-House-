@@ -17,7 +17,7 @@ let catData = {
 };
 
 // When a player connects to the game
-io.on('connection', (socket) => => {
+io.on('connection', (socket) => {
     console.log('A player connected!');
 
     // Instantly send them the current cat data
