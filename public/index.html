@@ -2,22 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Our Cat Game</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            background-color: #fce4ec; /* Cute pink background */
-            margin-top: 50px;
+            background-color: #fce4ec;
+            margin: 10px;
+            /* Prevents the whole page from bouncing on mobile */
+            overscroll-behavior-y: contain; 
         }
-        #game-area {
+        #ui-area {
             background: white;
-            width: 300px;
-            margin: 0 auto;
-            padding: 20px;
+            padding: 15px;
             border-radius: 15px;
             box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         button {
             background-color: #ff4081;
@@ -28,43 +29,109 @@
             cursor: pointer;
             font-size: 16px;
         }
-        button:hover {
-            background-color: #e91e63;
+        /* Our new house room! */
+        #room {
+            width: 300px;
+            height: 300px;
+            background-color: #ffe0b2; /* Light wood color */
+            border: 4px solid #8d6e63; /* Dark wood borders */
+            border-radius: 10px;
+            position: relative;
+            margin: 0 auto;
+            overflow: hidden; /* Keeps furniture inside the walls */
         }
-        .cat-emoji {
-            font-size: 80px;
+        /* Style for the draggable items */
+        .furniture {
+            position: absolute;
+            font-size: 40px;
+            cursor: grab;
+            user-select: none;
+            touch-action: none; /* Crucial for phone: stops screen scrolling while dragging */
         }
     </style>
 </head>
 <body>
 
-    <div id="game-area">
-        <h1>Cat Care!</h1>
-        <div class="cat-emoji">😸</div>
-        <h2>Name: <span id="cat-name">Loading...</span></h2>
-        <p>Hunger: <span id="cat-hunger">0</span>/100</p>
-        <button id="feed-btn">Feed Cat 🐟</button>
+    <div id="ui-area">
+        <h2>Cat Care! 😸</h2>
+        <p><span id="cat-name">Luna</span>'s Hunger: <span id="cat-hunger">0</span>/100</p>
+        <button id="feed-btn">Feed 🐟</button>
     </div>
+
+    <div id="room">
+        </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Connect to the server
         const socket = io();
-
-        // Get elements from the page
-        const catNameLabel = document.getElementById('cat-name');
         const catHungerLabel = document.getElementById('cat-hunger');
         const feedButton = document.getElementById('feed-btn');
+        const room = document.getElementById('room');
 
-        // Listen for updates from the server
+        // --- CAT LOGIC ---
         socket.on('updateCat', (catData) => {
-            catNameLabel.innerText = catData.name;
             catHungerLabel.innerText = catData.hunger;
         });
 
-        // When the player clicks feed, tell the server!
         feedButton.addEventListener('click', () => {
             socket.emit('feedCat');
+        });
+
+        // --- HOUSE & FURNITURE LOGIC ---
+        socket.on('updateHouse', (houseData) => {
+            houseData.forEach(item => {
+                // Check if the furniture is already on the screen
+                let el = document.getElementById(item.id);
+                
+                // If it's not on the screen yet, create it!
+                if (!el) {
+                    el = document.createElement('div');
+                    el.className = 'furniture';
+                    el.id = item.id;
+                    el.innerText = item.emoji;
+                    room.appendChild(el);
+
+                    // --- DRAG AND DROP MAGIC ---
+                    let isDragging = false;
+
+                    // When you touch the screen
+                    el.addEventListener('pointerdown', (e) => {
+                        isDragging = true;
+                        el.setPointerCapture(e.pointerId);
+                    });
+
+                    // When you move your finger
+                    el.addEventListener('pointermove', (e) => {
+                        if (isDragging) {
+                            const roomRect = room.getBoundingClientRect();
+                            // Calculate position relative to the room walls
+                            let newX = e.clientX - roomRect.left - 20; 
+                            let newY = e.clientY - roomRect.top - 20;
+                            el.style.left = newX + 'px';
+                            el.style.top = newY + 'px';
+                        }
+                    });
+
+                    // When you let go of the screen
+                    el.addEventListener('pointerup', (e) => {
+                        if (isDragging) {
+                            isDragging = false;
+                            el.releasePointerCapture(e.pointerId);
+                            
+                            // Get final position and tell the server!
+                            const roomRect = room.getBoundingClientRect();
+                            let finalX = e.clientX - roomRect.left - 20;
+                            let finalY = e.clientY - roomRect.top - 20;
+                            
+                            socket.emit('moveFurniture', { id: item.id, x: finalX, y: finalY });
+                        }
+                    });
+                }
+                
+                // Update the visual position based on server data
+                el.style.left = item.x + 'px';
+                el.style.top = item.y + 'px';
+            });
         });
     </script>
 </body>
